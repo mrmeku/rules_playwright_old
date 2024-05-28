@@ -1,6 +1,13 @@
 import { format } from "util";
-import { browsers } from "./browsers.json";
-
+import { browsers } from "./tests/browsers.json";
+import {
+  rmdirSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  copyFileSync,
+} from "fs";
+import { join } from "path";
 const PLAYWRIGHT_CDN_MIRRORS = [
   "https://playwright.azureedge.net",
   "https://playwright-akamai.azureedge.net",
@@ -283,7 +290,8 @@ const platformToOs: Record<PlaywrightPlatform, OS> = {
 };
 
 const browserSet = new Set(Object.values(PlaywrightBrowser));
-const httpArchives = browsers.flatMap((browser) => {
+
+const browserWorkspaceRules = browsers.flatMap((browser) => {
   if (!browserSet.has(browser.name as PlaywrightBrowser)) {
     return [];
   }
@@ -294,43 +302,58 @@ const httpArchives = browsers.flatMap((browser) => {
   return Object.entries(paths)
     .filter((entry): entry is [PlaywrightPlatform, string] => Boolean(entry[1]))
     .map(([platform, template]) => {
-      const downloadPath = format(template, browserName);
-      const executablePath =
-        EXECUTABLE_PATHS[browserGroup][platformToOs[platform]];
+      const downloadPath = format(template, browser.revision);
+      const extractionPath = `${platform}/${browserName}-${browser.revision}`;
       return {
         name: `${browserName}-${platform}`,
-        urls: PLAYWRIGHT_CDN_MIRRORS.map(
-          (cdnHost) => `"${cdnHost}/${downloadPath}"`
-        ),
-        stripPrefix: downloadPath.split("/").pop(),
-        buildFileContent: `"""
-    filegroup(
-        name = "all",
-        srcs = glob(["**"]),
-        visibility = ["//visibility:public"],
-    )
-
-    filegroup(
-        name = "bin",
-        srcs = ["${executablePath.join("/")}"],
-        visibility = ["//visibility:public"],
-    )
-    """`,
+        downloadedZipPath: downloadPath,
+        extractionPath,
+        extractionDir: `${browserName}-${browser.revision}`,
+        executableFilePath:
+          EXECUTABLE_PATHS[browserGroup][platformToOs[platform]],
       };
     });
 });
 
-const buildFile = httpArchives
+const workspaceContent = `
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+${browserWorkspaceRules
   .map(
-    ({ name, stripPrefix, urls, buildFileContent }) => `new_http_archive(
+    ({ name, downloadedZipPath }) => `http_file(
     name = "${name}",
-    build_file_content = ${buildFileContent},
-    urls = [
-        ${urls.join(",\n        ")}
+    urls = [${PLAYWRIGHT_CDN_MIRRORS.map(
+      (cdnHost) => `
+        "${cdnHost}/${downloadedZipPath}"`
+    ).join()}
     ],
-    strip_prefix = "${stripPrefix}",
 )`
   )
-  .join("\n\n");
+  .join("\n\n")}`;
 
-console.log(buildFile);
+const buildFileContent = `
+load("//:unzip_browser.bzl", "unzip_browser")
+
+${browserWorkspaceRules
+  .map(
+    ({ name, extractionPath, extractionDir }) => `unzip_browser(
+    name = "${name}",
+    browser = "@${name}//file",
+    output_dir = "${extractionPath}",
+)`
+  )
+  .join("\n\n")}
+`;
+
+const outDir = join(__dirname, "./test-out");
+if (existsSync(outDir)) {
+  rmdirSync(outDir, { recursive: true });
+}
+
+mkdirSync(outDir);
+writeFileSync(join(outDir, "WORKSPACE"), workspaceContent);
+writeFileSync(join(outDir, "BUILD.bazel"), buildFileContent);
+copyFileSync(
+  join(__dirname, "unzip_browser.bzl"),
+  join(outDir, "unzip_browser.bzl")
+);
