@@ -339,7 +339,7 @@ ${browserWorkspaceRules
     ({ name, extractionPath, extractionDir }) => `unzip_browser(
     name = "${name}",
     browser = "@${name}//file",
-    output_dir = "${extractionPath}",
+    output_dir = "${extractionDir}/${extractionPath}",
 )`
   )
   .join("\n\n")}

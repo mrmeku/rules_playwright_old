@@ -47,3 +47,14 @@ playwright_toolchains(
    playwright_version = "1.43.1",
 )
 ```
+
+Make sure the toolchain mirrors the directory structure under 
+/Users/mrmeku/Library/Caches/ms-playwright
+chromium-1148/
+   DEPENDENCIES_VALIDATED: EMPTY FILE
+   INSTALLATION_COMPLETE: EMPTY MARKER FILE
+   chrome-mac: actual dir
+ffmpeg-1010
+webkit-2104
+chromium_headless_shell-1148
+firefox-1466

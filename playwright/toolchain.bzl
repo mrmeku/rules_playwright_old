@@ -1,7 +1,7 @@
 """This module implements the language-specific toolchain rule.
 """
 
-playwrightInfo = provider(
+playwright_info = provider(
     doc = "Information about how to invoke the tool executable.",
     fields = {
         "target_tool_path": "Path to the tool executable for the target platform.",
@@ -31,16 +31,16 @@ def _playwright_toolchain_impl(ctx):
         tool_files = ctx.attr.target_tool.files.to_list()
         target_tool_path = _to_manifest_path(ctx, tool_files[0])
 
-    # Make the $(tool_BIN) variable available in places like genrules.
+    # Make the $(TOOL_BIN) variable available in places like genrules.
     # See https://docs.bazel.build/versions/main/be/make-variables.html#custom_variables
     template_variables = platform_common.TemplateVariableInfo({
-        "playwright_BIN": target_tool_path,
+        "PLAYWRIGHT_BIN": target_tool_path,
     })
     default = DefaultInfo(
         files = depset(tool_files),
         runfiles = ctx.runfiles(files = tool_files),
     )
-    playwrightinfo = playwrightInfo(
+    playwrightinfo = playwright_info(
         target_tool_path = target_tool_path,
         tool_files = tool_files,
     )
